@@ -1,0 +1,137 @@
+name: CI - Build & Test Suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # ==========================================
+  # 1. C++ Engine: Linux Build (GCC & CMake)
+  # ==========================================
+  cpp-linux:
+    name: C++ Engine (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev build-essential cmake
+
+      - name: Build with Makefile
+        run: |
+          make
+          ./asta-sec -h
+
+      - name: Clean build
+        run: make clean
+
+      - name: Build with CMake
+        run: |
+          cmake -B build -S .
+          cmake --build build --config Release
+          ./build/asta-sec -h
+
+  # ==========================================
+  # 2. C++ Engine: Windows Build (CMake & MSVC)
+  # ==========================================
+  cpp-windows:
+    name: C++ Engine (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download & Extract Npcap SDK
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile "npcap-sdk.zip"
+          Expand-Archive -Path "npcap-sdk.zip" -DestinationPath "npcap-sdk"
+          Get-ChildItem -Path "npcap-sdk"
+
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          cmake -B build -S . -DPCAP_INCLUDE_DIR="$PWD/npcap-sdk/Include" -DPCAP_LIBRARY="$PWD/npcap-sdk/Lib/x64/wpcap.lib"
+
+      - name: Build Executable
+        shell: pwsh
+        run: |
+          cmake --build build --config Release
+
+      - name: Verify Binary Output
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path build -Recurse -Filter "asta-sec.exe" | Select-Object -First 1
+          if ($exe) {
+            Write-Host "Found binary at $($exe.FullName)"
+          } else {
+            throw "asta-sec.exe not found in build directory"
+          }
+
+  # ==========================================
+  # 3. Node.js Backend & CLI Tests
+  # ==========================================
+  node-backend:
+    name: Node.js Backend & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Root Dependencies
+        run: npm ci
+
+      - name: Run Unit Tests
+        run: npm test
+
+      - name: Verify CLI Help Output
+        run: node ./bin/asta-sec.js --help || true
+
+  # ==========================================
+  # 4. Angular 20 Web Dashboard Build
+  # ==========================================
+  angular-dashboard:
+    name: Angular Web Dashboard Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install Angular Dependencies
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Build Angular Production Distribution
+        working-directory: dashboard
+        run: npm run build
+
+      - name: Verify Distribution Files
+        run: |
+          test -f dashboard/dist/dashboard/browser/index.html
+          echo "Angular build successfully verified!"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: angular-dashboard-dist
+          path: dashboard/dist/dashboard/browser/
+          retention-days: 7

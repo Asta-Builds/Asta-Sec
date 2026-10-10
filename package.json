@@ -8,7 +8,9 @@
   },
   "type": "module",
   "scripts": {
-    "start": "node ./bin/asta-sec.js"
+    "start": "node ./bin/asta-sec.js",
+    "build:dashboard": "npm --prefix dashboard run build",
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "security",

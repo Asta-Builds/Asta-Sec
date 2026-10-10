@@ -1,0 +1,135 @@
+name: CD - Build & Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag Name (e.g. v2.0.0)'
+        required: true
+        default: 'v2.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  # ==========================================
+  # 1. Build Linux Binary
+  # ==========================================
+  build-linux:
+    name: Build Linux Release Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev build-essential cmake
+
+      - name: Build Binary
+        run: |
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+          mv build/asta-sec ./asta-sec-linux-x86_64
+          chmod +x ./asta-sec-linux-x86_64
+          tar -czvf asta-sec-linux-x86_64.tar.gz asta-sec-linux-x86_64 README.md
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: asta-sec-linux
+          path: asta-sec-linux-x86_64.tar.gz
+
+  # ==========================================
+  # 2. Build Windows Binary
+  # ==========================================
+  build-windows:
+    name: Build Windows Release Package
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download & Extract Npcap SDK
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile "npcap-sdk.zip"
+          Expand-Archive -Path "npcap-sdk.zip" -DestinationPath "npcap-sdk"
+
+      - name: Configure and Build
+        shell: pwsh
+        run: |
+          cmake -B build -S . -DPCAP_INCLUDE_DIR="$PWD/npcap-sdk/Include" -DPCAP_LIBRARY="$PWD/npcap-sdk/Lib/x64/wpcap.lib"
+          cmake --build build --config Release
+          $exe = Get-ChildItem -Path build -Recurse -Filter "asta-sec.exe" | Select-Object -First 1
+          Compress-Archive -Path $exe.FullName, "asta-sec.bat", "asta-sec.ps1", "README.md" -DestinationPath "asta-sec-windows-x64.zip"
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: asta-sec-windows
+          path: asta-sec-windows-x64.zip
+
+  # ==========================================
+  # 3. Build Angular Dashboard Bundle
+  # ==========================================
+  build-dashboard:
+    name: Build Angular Web Dashboard Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Build Angular
+        working-directory: dashboard
+        run: |
+          npm ci
+          npm run build
+          tar -czvf ../asta-sec-dashboard.tar.gz -C dist/dashboard/browser .
+
+      - name: Upload Dashboard Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: asta-sec-dashboard
+          path: asta-sec-dashboard.tar.gz
+
+  # ==========================================
+  # 4. Publish GitHub Release
+  # ==========================================
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-linux, build-windows, build-dashboard]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets/
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
+          name: "ASTA-SEC Release ${{ github.event.inputs.tag_name || github.ref_name }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            release-assets/asta-sec-linux-x86_64.tar.gz
+            release-assets/asta-sec-windows-x64.zip
+            release-assets/asta-sec-dashboard.tar.gz
