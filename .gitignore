@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+dashboard/node_modules/
+dashboard/.angular/
+
+# Toolchains and SDKs
+w64devkit/
+npcap-sdk/
+
+# Compiled native binaries
+*.exe
+*.o
+*.obj
+*.a
+*.lib
+
+# Security credentials and local test certificates
+*.key
+*.crt
+*.pem
+.asta-sec/
+
+# Temporary files and logs
+subdomains.txt
+*.log
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

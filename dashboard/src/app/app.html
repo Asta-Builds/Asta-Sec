@@ -1,0 +1,610 @@
+<div class="dashboard-shell">
+  <!-- Top Navigation & Status Bar -->
+  <header class="top-nav">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <div class="brand-text">
+        <span class="brand-title">ASTA-SEC</span>
+        <span class="brand-subtitle">INTERCEPTING PROXY v2.0</span>
+      </div>
+    </div>
+
+    <!-- Center Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab() === 'intercept'" 
+        (click)="activeTab.set('intercept')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span>Intercept</span>
+        <span class="badge badge-warning" *ngIf="proxyService.pendingRequests().length > 0">
+          {{ proxyService.pendingRequests().length }}
+        </span>
+      </button>
+
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab() === 'history'" 
+        (click)="activeTab.set('history')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect width="18" height="18" x="3" y="3" rx="2"/>
+          <path d="M3 9h18"/>
+          <path d="M3 15h18"/>
+          <path d="M9 3v18"/>
+        </svg>
+        <span>HTTP History</span>
+        <span class="badge badge-neutral">
+          {{ proxyService.history().length }}
+        </span>
+      </button>
+
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab() === 'repeater'" 
+        (click)="activeTab.set('repeater')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+        <span>Repeater</span>
+      </button>
+
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab() === 'decoder'" 
+        (click)="activeTab.set('decoder')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 18 22 12 16 6"/>
+          <polyline points="8 6 2 12 8 18"/>
+        </svg>
+        <span>Decoder</span>
+      </button>
+
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab() === 'setup'" 
+        (click)="activeTab.set('setup')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="7.5" cy="15.5" r="5.5"/>
+          <path d="m21 2-9.6 9.6"/>
+          <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+        </svg>
+        <span>Setup &amp; CA</span>
+      </button>
+    </nav>
+
+    <!-- Right Controls -->
+    <div class="top-controls">
+      <!-- Intercept Toggle Switch -->
+      <button 
+        class="intercept-toggle-btn"
+        [class.active]="proxyService.interceptEnabled()"
+        (click)="proxyService.toggleIntercept()">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" *ngIf="proxyService.interceptEnabled()">
+          <rect x="6" y="4" width="4" height="16"/>
+          <rect x="14" y="4" width="4" height="16"/>
+        </svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" *ngIf="!proxyService.interceptEnabled()">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        <span>{{ proxyService.interceptEnabled() ? 'Intercept is ON' : 'Intercept is OFF' }}</span>
+      </button>
+
+      <!-- Connection status badge -->
+      <div class="status-indicator" [class.connected]="proxyService.connectionStatus() === 'connected'">
+        <span class="status-dot"></span>
+        <span class="status-text">127.0.0.1:8080</span>
+      </div>
+
+      <!-- Root CA button -->
+      <a [href]="proxyService.getRootCaDownloadUrl()" class="btn-icon" title="Download Root CA Certificate" download>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </a>
+
+      <!-- Clear button -->
+      <button class="btn-icon" title="Clear HTTP History" (click)="proxyService.clearHistory()">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="main-body">
+
+    <!-- ============================================== -->
+    <!-- TAB 1: INTERCEPT VIEW                          -->
+    <!-- ============================================== -->
+    <section class="tab-pane intercept-pane" *ngIf="activeTab() === 'intercept'">
+      <div class="intercept-toolbar">
+        <div class="toolbar-left">
+          <button 
+            class="action-btn forward-btn" 
+            [disabled]="!currentInterceptItem" 
+            (click)="forwardCurrentIntercept()">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span>Forward</span>
+          </button>
+
+          <button 
+            class="action-btn drop-btn" 
+            [disabled]="!currentInterceptItem" 
+            (click)="dropCurrentIntercept()">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            <span>Drop</span>
+          </button>
+
+          <button 
+            class="action-btn"
+            [class.active-btn]="proxyService.interceptEnabled()"
+            (click)="proxyService.toggleIntercept()">
+            <span>{{ proxyService.interceptEnabled() ? 'Intercept is ON' : 'Intercept is OFF' }}</span>
+          </button>
+        </div>
+
+        <div class="toolbar-right" *ngIf="proxyService.pendingRequests().length > 0">
+          <span class="queue-counter">
+            Queue: <strong>{{ interceptActiveIndex() + 1 }}</strong> of <strong>{{ proxyService.pendingRequests().length }}</strong>
+          </span>
+        </div>
+      </div>
+
+      <!-- If no intercepted request -->
+      <div class="empty-intercept-state" *ngIf="!currentInterceptItem">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <h3>No Intercepted Requests</h3>
+        <p *ngIf="!proxyService.interceptEnabled()">
+          Interception is currently <strong>OFF</strong>. Click <strong>Intercept is OFF</strong> above to start pausing HTTP/HTTPS traffic.
+        </p>
+        <p *ngIf="proxyService.interceptEnabled()">
+          Interception is <strong>ON</strong>. Direct your browser or app to HTTP/HTTPS Proxy <code>127.0.0.1:8080</code> to capture traffic.
+        </p>
+      </div>
+
+      <!-- If request is intercepted -->
+      <div class="intercept-editor-layout" *ngIf="currentInterceptItem">
+        <div class="intercept-meta-bar">
+          <span class="method-tag method-{{ currentInterceptItem.method }}">{{ currentInterceptItem.method }}</span>
+          <span class="url-text">{{ currentInterceptItem.url }}</span>
+        </div>
+
+        <div class="editor-subtabs">
+          <button 
+            class="subtab-btn" 
+            [class.active]="interceptSubView() === 'raw'" 
+            (click)="interceptSubView.set('raw')">
+            Raw Headers &amp; Body
+          </button>
+        </div>
+
+        <div class="editor-pane">
+          <div class="editor-box">
+            <label class="editor-label">HTTP Headers (Editable)</label>
+            <textarea 
+              class="code-editor" 
+              [ngModel]="interceptEditHeaders()" 
+              (ngModelChange)="interceptEditHeaders.set($event)"></textarea>
+          </div>
+
+          <div class="editor-box">
+            <label class="editor-label">HTTP Payload / Body (Editable)</label>
+            <textarea 
+              class="code-editor" 
+              [ngModel]="interceptEditBody()" 
+              (ngModelChange)="interceptEditBody.set($event)"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- TAB 2: HTTP HISTORY VIEW                       -->
+    <!-- ============================================== -->
+    <section class="tab-pane history-pane" *ngIf="activeTab() === 'history'">
+      <!-- History Controls Bar -->
+      <div class="history-controls">
+        <div class="search-box">
+          <svg class="icon search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input 
+            type="text" 
+            placeholder="Filter by host, path, status, or method..." 
+            [ngModel]="searchQuery()" 
+            (ngModelChange)="searchQuery.set($event)" />
+        </div>
+
+        <div class="filter-chips">
+          <button 
+            class="chip" 
+            [class.active]="filterType() === 'all'" 
+            (click)="filterType.set('all')">
+            All ({{ proxyService.history().length }})
+          </button>
+          <button 
+            class="chip" 
+            [class.active]="filterType() === 'https'" 
+            (click)="filterType.set('https')">
+            HTTPS
+          </button>
+          <button 
+            class="chip" 
+            [class.active]="filterType() === 'http'" 
+            (click)="filterType.set('http')">
+            HTTP
+          </button>
+          <button 
+            class="chip" 
+            [class.active]="filterType() === 'errors'" 
+            (click)="filterType.set('errors')">
+            Errors (4xx / 5xx)
+          </button>
+        </div>
+      </div>
+
+      <!-- Split Table & Inspector Layout -->
+      <div class="history-split-view">
+        <!-- Top/Left: Table of Traffic -->
+        <div class="table-container">
+          <table class="traffic-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th style="width: 75px;">Method</th>
+                <th style="width: 190px;">Host</th>
+                <th>Path</th>
+                <th style="width: 75px;">Status</th>
+                <th style="width: 80px;">Size</th>
+                <th style="width: 75px;">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr 
+                *ngFor="let item of filteredHistory(); let i = index" 
+                [class.selected]="proxyService.selectedItem()?.id === item.id"
+                (click)="selectHistoryItem(item)">
+                <td class="col-num">{{ filteredHistory().length - i }}</td>
+                <td>
+                  <span class="method-tag method-{{ item.method }}">{{ item.method }}</span>
+                </td>
+                <td class="col-host" [title]="item.host">{{ item.host }}</td>
+                <td class="col-path" [title]="item.path">{{ item.path }}</td>
+                <td>
+                  <span 
+                    class="status-tag" 
+                    [class.status-2xx]="item.responseStatus >= 200 && item.responseStatus < 300"
+                    [class.status-3xx]="item.responseStatus >= 300 && item.responseStatus < 400"
+                    [class.status-4xx]="item.responseStatus >= 400 && item.responseStatus < 500"
+                    [class.status-5xx]="item.responseStatus >= 500">
+                    {{ item.responseStatus }}
+                  </span>
+                </td>
+                <td class="col-meta">{{ item.size }} B</td>
+                <td class="col-meta">{{ item.durationMs }} ms</td>
+              </tr>
+              <tr *ngIf="filteredHistory().length === 0">
+                <td colspan="7" class="empty-table-row">
+                  No network traffic matching filter.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Detail Inspector for Selected Item -->
+        <div class="inspector-container" *ngIf="proxyService.selectedItem() as sel">
+          <div class="inspector-header">
+            <div class="meta-line">
+              <span class="method-tag method-{{ sel.method }}">{{ sel.method }}</span>
+              <span class="url-label" [title]="sel.url">{{ sel.url }}</span>
+            </div>
+            <button class="action-btn repeater-btn" (click)="sendToRepeater(sel)">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+              <span>Send to Repeater</span>
+            </button>
+          </div>
+
+          <div class="inspector-panes">
+            <!-- Left: Request Details -->
+            <div class="pane-column">
+              <div class="pane-tabs">
+                <span class="pane-title">Request</span>
+                <button 
+                  class="subtab-btn" 
+                  [class.active]="historyReqView() === 'headers'" 
+                  (click)="historyReqView.set('headers')">
+                  Headers
+                </button>
+                <button 
+                  class="subtab-btn" 
+                  [class.active]="historyReqView() === 'raw'" 
+                  (click)="historyReqView.set('raw')">
+                  Raw
+                </button>
+              </div>
+
+              <div class="pane-content" *ngIf="historyReqView() === 'headers'">
+                <div class="kv-table">
+                  <div class="kv-row" *ngFor="let kv of sel.requestHeaders | keyvalue">
+                    <span class="kv-key">{{ kv.key }}:</span>
+                    <span class="kv-val">{{ kv.value }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pane-content" *ngIf="historyReqView() === 'raw'">
+                <pre class="raw-code">{{ formatRawRequest(sel) }}</pre>
+              </div>
+            </div>
+
+            <!-- Right: Response Details -->
+            <div class="pane-column">
+              <div class="pane-tabs">
+                <span class="pane-title">Response ({{ sel.responseStatus }} {{ sel.responseStatusText }})</span>
+                <button 
+                  class="subtab-btn" 
+                  [class.active]="historyResView() === 'headers'" 
+                  (click)="historyResView.set('headers')">
+                  Headers
+                </button>
+                <button 
+                  class="subtab-btn" 
+                  [class.active]="historyResView() === 'raw'" 
+                  (click)="historyResView.set('raw')">
+                  Raw
+                </button>
+                <button 
+                  class="subtab-btn" 
+                  [class.active]="historyResView() === 'body'" 
+                  (click)="historyResView.set('body')">
+                  Body
+                </button>
+              </div>
+
+              <div class="pane-content" *ngIf="historyResView() === 'headers'">
+                <div class="kv-table">
+                  <div class="kv-row" *ngFor="let kv of sel.responseHeaders | keyvalue">
+                    <span class="kv-key">{{ kv.key }}:</span>
+                    <span class="kv-val">{{ kv.value }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pane-content" *ngIf="historyResView() === 'raw'">
+                <pre class="raw-code">{{ formatRawResponse(sel) }}</pre>
+              </div>
+
+              <div class="pane-content" *ngIf="historyResView() === 'body'">
+                <pre class="raw-code">{{ sel.responseBody || '[No response body]' }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="inspector-placeholder" *ngIf="!proxyService.selectedItem()">
+          <p>Select any request from the history table above to inspect its headers and payload.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- TAB 3: REPEATER VIEW                           -->
+    <!-- ============================================== -->
+    <section class="tab-pane repeater-pane" *ngIf="activeTab() === 'repeater'">
+      <!-- Repeater Control Bar -->
+      <div class="repeater-control-bar">
+        <select class="method-select" [ngModel]="repeaterMethod()" (ngModelChange)="repeaterMethod.set($event)">
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+          <option value="PUT">PUT</option>
+          <option value="DELETE">DELETE</option>
+          <option value="PATCH">PATCH</option>
+          <option value="HEAD">HEAD</option>
+          <option value="OPTIONS">OPTIONS</option>
+        </select>
+
+        <input 
+          type="text" 
+          class="url-input" 
+          placeholder="https://target.com/api/endpoint"
+          [ngModel]="repeaterUrl()" 
+          (ngModelChange)="repeaterUrl.set($event)" />
+
+        <button 
+          class="action-btn send-btn" 
+          [disabled]="repeaterLoading()" 
+          (click)="sendRepeater()">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+          <span>{{ repeaterLoading() ? 'Sending...' : 'Send' }}</span>
+        </button>
+      </div>
+
+      <!-- Repeater Split View -->
+      <div class="repeater-split">
+        <!-- Left: Editable Request -->
+        <div class="repeater-column">
+          <div class="column-header">Request Editor</div>
+          <div class="editor-section">
+            <label class="section-label">Headers</label>
+            <textarea 
+              class="code-editor" 
+              style="height: 180px;" 
+              [ngModel]="repeaterHeaders()" 
+              (ngModelChange)="repeaterHeaders.set($event)">
+            </textarea>
+          </div>
+          <div class="editor-section" style="flex: 1; display: flex; flex-direction: column;">
+            <label class="section-label">Payload / Body</label>
+            <textarea 
+              class="code-editor" 
+              style="flex: 1;" 
+              placeholder="Request body (JSON, XML, or raw text)..." 
+              [ngModel]="repeaterBody()" 
+              (ngModelChange)="repeaterBody.set($event)">
+            </textarea>
+          </div>
+        </div>
+
+        <!-- Right: Response Viewer -->
+        <div class="repeater-column">
+          <div class="column-header">
+            <span>Response</span>
+            <div class="response-stats" *ngIf="repeaterResponse() as resp">
+              <span class="status-tag status-2xx">{{ resp.status }} {{ resp.statusText }}</span>
+              <span class="stat-pill">{{ resp.durationMs }} ms</span>
+              <span class="stat-pill">{{ resp.size }} B</span>
+            </div>
+          </div>
+
+          <div class="response-content" *ngIf="repeaterResponse() as resp">
+            <div class="editor-section" style="max-height: 180px; overflow-y: auto;">
+              <label class="section-label">Response Headers</label>
+              <div class="kv-table">
+                <div class="kv-row" *ngFor="let kv of resp.headers | keyvalue">
+                  <span class="kv-key">{{ kv.key }}:</span>
+                  <span class="kv-val">{{ kv.value }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="editor-section" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+              <label class="section-label">Response Body</label>
+              <pre class="raw-code" style="flex: 1; overflow: auto;">{{ resp.body }}</pre>
+            </div>
+          </div>
+
+          <div class="empty-state" *ngIf="!repeaterResponse() && !repeaterLoading()">
+            <p>Enter a target URL and click <strong>Send</strong> to inspect the live response.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- TAB 4: DECODER VIEW                            -->
+    <!-- ============================================== -->
+    <section class="tab-pane decoder-pane" *ngIf="activeTab() === 'decoder'">
+      <div class="decoder-layout">
+        <div class="decoder-section">
+          <label class="section-label">Input Data</label>
+          <textarea 
+            class="code-editor" 
+            style="height: 220px;" 
+            placeholder="Paste text, URL query, Base64 or Hex string to transform..."
+            [ngModel]="decoderInput()" 
+            (ngModelChange)="decoderInput.set($event)">
+          </textarea>
+        </div>
+
+        <!-- Decoder Action Buttons -->
+        <div class="decoder-actions">
+          <button class="chip" (click)="runDecoder('url_encode')">URL Encode</button>
+          <button class="chip" (click)="runDecoder('url_decode')">URL Decode</button>
+          <button class="chip" (click)="runDecoder('base64_encode')">Base64 Encode</button>
+          <button class="chip" (click)="runDecoder('base64_decode')">Base64 Decode</button>
+          <button class="chip" (click)="runDecoder('hex_encode')">Hex Encode</button>
+          <button class="chip" (click)="runDecoder('hex_decode')">Hex Decode</button>
+        </div>
+
+        <div class="decoder-section">
+          <div class="section-header-flex">
+            <label class="section-label">Decoded / Encoded Output</label>
+            <button class="btn-text" (click)="copyDecoderOutput()">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+              </svg>
+              <span>Copy to Clipboard</span>
+            </button>
+          </div>
+          <textarea 
+            class="code-editor" 
+            style="height: 220px;" 
+            readonly 
+            [ngModel]="decoderOutput()">
+          </textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- TAB 5: SETUP & CA GUIDE                        -->
+    <!-- ============================================== -->
+    <section class="tab-pane setup-pane" *ngIf="activeTab() === 'setup'">
+      <div class="setup-grid">
+        <!-- Card 1: CA Certificate Installation -->
+        <div class="setup-card">
+          <div class="card-header">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="7.5" cy="15.5" r="5.5"/>
+              <path d="m21 2-9.6 9.6"/>
+              <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+            </svg>
+            <h3>1. Install Root Certificate Authority (CA)</h3>
+          </div>
+          <p>
+            To intercept and decrypt HTTPS traffic, download the ASTA-SEC Root Certificate and trust it in your OS or browser certificate store.
+          </p>
+          <div style="margin: 16px 0;">
+            <a [href]="proxyService.getRootCaDownloadUrl()" class="action-btn forward-btn" download>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>Download asta-ca.crt</span>
+            </a>
+          </div>
+          <ul class="steps-list">
+            <li><strong>Windows:</strong> Double click <code>asta-ca.crt</code> &rarr; <em>Install Certificate</em> &rarr; <em>Local Machine</em> &rarr; <em>Place in "Trusted Root Certification Authorities"</em>.</li>
+            <li><strong>Firefox:</strong> Settings &rarr; <em>Privacy &amp; Security</em> &rarr; <em>Certificates</em> &rarr; <em>View Certificates</em> &rarr; <em>Import</em> &rarr; Select <code>asta-ca.crt</code> &rarr; Check <em>Trust this CA to identify websites</em>.</li>
+            <li><strong>Chrome / Edge:</strong> Inherits the Windows Trusted Root store configured above.</li>
+          </ul>
+        </div>
+
+        <!-- Card 2: Browser Proxy Configuration -->
+        <div class="setup-card">
+          <div class="card-header">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <h3>2. Configure Browser Proxy</h3>
+          </div>
+          <p>Configure your browser or proxy extension (like FoxyProxy) to route traffic through ASTA-SEC:</p>
+          <div class="proxy-param-box">
+            <div><strong>Proxy IP:</strong> <code>127.0.0.1</code></div>
+            <div><strong>Proxy Port:</strong> <code>8080</code></div>
+            <div><strong>Protocols:</strong> HTTP &amp; HTTPS</div>
+          </div>
+          <p style="margin-top: 14px;"><strong>Command Line (cURL Testing):</strong></p>
+          <pre class="code-snippet">curl -x http://127.0.0.1:8080 --cacert asta-ca.crt https://httpbin.org/get</pre>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>

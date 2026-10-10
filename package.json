@@ -1,0 +1,31 @@
+{
+  "name": "asta-sec",
+  "version": "2.0.0",
+  "description": "ASTA-SEC // Advanced Network & Security Suite CLI",
+  "main": "bin/asta-sec.js",
+  "bin": {
+    "asta-sec": "./bin/asta-sec.js"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node ./bin/asta-sec.js"
+  },
+  "keywords": [
+    "security",
+    "sniffer",
+    "pcap",
+    "port-scanner",
+    "vulnerability-scanner",
+    "owasp",
+    "dns",
+    "cli"
+  ],
+  "author": "ASTA-SEC Team",
+  "license": "MIT",
+  "dependencies": {
+    "@inquirer/prompts": "^7.3.2",
+    "chalk": "^5.4.1",
+    "node-forge": "^1.4.0",
+    "ws": "^8.22.0"
+  }
+}
