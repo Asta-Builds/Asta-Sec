@@ -1322,3 +1322,321 @@
   flex-direction: column;
   overflow: hidden;
 }
+
+/* ========================================== */
+/* Top Header Report Button                   */
+/* ========================================== */
+.report-btn {
+  background-color: #312e81;
+  border-color: #4f46e5;
+  color: #e0e7ff;
+}
+
+.report-btn:hover {
+  background-color: #3730a3;
+  color: #ffffff;
+}
+
+/* ========================================== */
+/* Decoder Subnav & JWT Inspector             */
+/* ========================================== */
+.decoder-subnav {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.jwt-layout {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.jwt-input {
+  border-color: var(--border-focus);
+}
+
+.jwt-warnings-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.warning-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #451a03;
+  border: 1px solid #d97706;
+  color: #fef3c7;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.warning-item .icon {
+  width: 18px;
+  height: 18px;
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+
+.warning-critical {
+  background-color: #450a0a;
+  border-color: #dc2626;
+  color: #fee2e2;
+}
+
+.warning-critical .icon {
+  color: #ef4444;
+}
+
+.jwt-exp-box {
+  display: flex;
+}
+
+.jwt-exp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.jwt-exp-pill .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.exp-valid {
+  background-color: #064e3b;
+  color: #a7f3d0;
+  border: 1px solid #059669;
+}
+
+.exp-expired {
+  background-color: #7f1d1d;
+  color: #fecaca;
+  border: 1px solid #dc2626;
+}
+
+.jwt-grid {
+  display: flex;
+  gap: 16px;
+}
+
+.jwt-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.jwt-part-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.jwt-tag-header {
+  background-color: #701a75;
+  color: #f5d0fe;
+}
+
+.jwt-tag-payload {
+  background-color: #083344;
+  color: #7dd3fc;
+}
+
+.jwt-tag-sig {
+  background-color: #1e1b4b;
+  color: #c7d2fe;
+}
+
+.sig-status-row {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.sig-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* ========================================== */
+/* Target Scope Configuration                 */
+/* ========================================== */
+.scope-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.scope-toggle-wrap {
+  margin: 12px 0;
+}
+
+.scope-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.scope-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-cyan);
+}
+
+.scope-actions-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.save-status-text {
+  font-size: 12px;
+  color: #34d399;
+  font-weight: 600;
+}
+
+/* ========================================== */
+/* Penetration Test Report Modal              */
+/* ========================================== */
+.report-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.report-modal {
+  width: 900px;
+  max-width: 95vw;
+  height: 85vh;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.report-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title-flex {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-icon {
+  width: 20px;
+  height: 20px;
+  color: #818cf8;
+}
+
+.report-modal-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.report-modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  background-color: var(--bg-primary);
+}
+
+.report-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: var(--text-muted);
+}
+
+.spinner-icon {
+  width: 32px;
+  height: 32px;
+  animation: spin 1.2s linear infinite;
+  color: var(--accent-cyan);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.report-markdown-preview {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.report-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background-color: var(--bg-card);
+  border-top: 1px solid var(--border-color);
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+}
+
+.report-meta-info {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

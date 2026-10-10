@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, effect, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProxyService, HistoryItem, InterceptItem, ScannerIssue, IntruderResult } from './services/proxy.service';
@@ -13,12 +13,22 @@ import { ProxyService, HistoryItem, InterceptItem, ScannerIssue, IntruderResult 
 export class App implements OnInit {
   public proxyService = inject(ProxyService);
 
+  constructor() {
+    effect(() => {
+      const rules = this.proxyService.scopeRules();
+      if (rules.length > 0 && !this.scopeRulesText()) {
+        this.scopeRulesText.set(rules.join('\n'));
+      }
+      this.interceptOnlyInScope.set(this.proxyService.interceptOnlyInScope());
+    });
+  }
+
   // Active navigation tab
   public activeTab = signal<'intercept' | 'history' | 'repeater' | 'intruder' | 'issues' | 'decoder' | 'setup'>('history');
 
   // History search and filtering
   public searchQuery = signal<string>('');
-  public filterType = signal<'all' | 'http' | 'https' | 'errors'>('all');
+  public filterType = signal<'all' | 'in_scope' | 'http' | 'https' | 'errors'>('all');
 
   public filteredHistory = computed(() => {
     const list = this.proxyService.history();
@@ -27,6 +37,7 @@ export class App implements OnInit {
 
     return list.filter(item => {
       // Type filter
+      if (type === 'in_scope' && item.inScope === false) return false;
       if (type === 'http' && item.protocol !== 'http') return false;
       if (type === 'https' && item.protocol !== 'https') return false;
       if (type === 'errors' && item.responseStatus < 400) return false;
@@ -96,10 +107,29 @@ export class App implements OnInit {
     };
   });
 
+  // Scope Management State
+  public scopeRulesText = signal<string>('');
+  public interceptOnlyInScope = signal<boolean>(true);
+  public scopeSaveStatus = signal<string>('');
+
+  // Pentest Report Modal State (Phase 5)
+  public showReportModal = signal<boolean>(false);
+  public reportMarkdown = signal<string>('');
+  public reportLoading = signal<boolean>(false);
+
   // Decoder State
+  public decoderSubTab = signal<'transform' | 'jwt'>('transform');
   public decoderInput = signal<string>('');
   public decoderOutput = signal<string>('');
   public decoderActiveAction = signal<string>('');
+
+  // JWT Analyzer State
+  public jwtRawInput = signal<string>('');
+  public jwtHeader = signal<any | null>(null);
+  public jwtPayload = signal<any | null>(null);
+  public jwtSignature = signal<string>('');
+  public jwtWarnings = signal<string[]>([]);
+  public jwtExpInfo = signal<{ isExpired: boolean; dateStr: string; relativeStr: string } | null>(null);
 
   ngOnInit() {
     this.proxyService.getIntruderPresets().subscribe({
@@ -108,6 +138,58 @@ export class App implements OnInit {
       },
       error: () => {}
     });
+
+    // Populate scope rules from service
+    const existingRules = this.proxyService.scopeRules();
+    if (existingRules.length > 0) {
+      this.scopeRulesText.set(existingRules.join('\n'));
+    }
+  }
+
+  // ----------------------------------------
+  // Scope Actions
+  // ----------------------------------------
+  public saveScopeConfig() {
+    const rules = this.scopeRulesText()
+      .split('\n')
+      .map(r => r.trim())
+      .filter(r => r.length > 0);
+
+    this.proxyService.saveScope(rules, this.interceptOnlyInScope()).subscribe({
+      next: () => {
+        this.scopeSaveStatus.set('Scope updated successfully.');
+        setTimeout(() => this.scopeSaveStatus.set(''), 3000);
+      },
+      error: () => {
+        this.scopeSaveStatus.set('Failed to save scope.');
+      }
+    });
+  }
+
+  // ----------------------------------------
+  // Pentest Report Actions (Phase 5)
+  // ----------------------------------------
+  public openReportModal() {
+    this.reportLoading.set(true);
+    this.showReportModal.set(true);
+    this.proxyService.getReportMarkdown().subscribe({
+      next: (res) => {
+        this.reportLoading.set(false);
+        this.reportMarkdown.set(res.markdown);
+      },
+      error: () => {
+        this.reportLoading.set(false);
+        this.reportMarkdown.set('# Error: Failed to generate report.');
+      }
+    });
+  }
+
+  public closeReportModal() {
+    this.showReportModal.set(false);
+  }
+
+  public copyReport() {
+    navigator.clipboard.writeText(this.reportMarkdown());
   }
 
   // ----------------------------------------
@@ -340,7 +422,7 @@ export class App implements OnInit {
   }
 
   // ----------------------------------------
-  // Decoder Actions
+  // Decoder & JWT Actions
   // ----------------------------------------
   public runDecoder(action: string) {
     this.decoderActiveAction.set(action);
@@ -385,5 +467,80 @@ export class App implements OnInit {
 
   public copyDecoderOutput() {
     navigator.clipboard.writeText(this.decoderOutput());
+  }
+
+  private base64UrlDecode(str: string): string {
+    let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    return decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+  }
+
+  public analyzeJwtToken() {
+    const raw = this.jwtRawInput().trim();
+    this.jwtWarnings.set([]);
+    this.jwtExpInfo.set(null);
+    this.jwtHeader.set(null);
+    this.jwtPayload.set(null);
+    this.jwtSignature.set('');
+
+    if (!raw) return;
+
+    const parts = raw.split('.');
+    if (parts.length !== 3) {
+      this.jwtWarnings.set(['Invalid JWT Structure: Token must contain exactly 3 dot-separated parts (header.payload.signature).']);
+      return;
+    }
+
+    const warnings: string[] = [];
+
+    // 1. Header
+    try {
+      const headerStr = this.base64UrlDecode(parts[0]);
+      const headerObj = JSON.parse(headerStr);
+      this.jwtHeader.set(headerObj);
+
+      if (headerObj.alg && headerObj.alg.toLowerCase() === 'none') {
+        warnings.push('CRITICAL: "alg: none" vulnerability! The application accepts unsigned JWT tokens without cryptographic verification.');
+      } else if (headerObj.alg && headerObj.alg.toUpperCase() === 'HS256') {
+        warnings.push('INFO: Symmetric HMAC (HS256) signature. Check for weak secrets or algorithm confusion attacks.');
+      }
+    } catch (e: any) {
+      warnings.push(`Header Parse Error: ${e.message}`);
+    }
+
+    // 2. Payload
+    try {
+      const payloadStr = this.base64UrlDecode(parts[1]);
+      const payloadObj = JSON.parse(payloadStr);
+      this.jwtPayload.set(payloadObj);
+
+      if (!payloadObj.exp) {
+        warnings.push('WARNING: No Expiration Claim ("exp") found. The token has unlimited lifetime and cannot expire naturally.');
+      } else {
+        const expTimeSec = Number(payloadObj.exp);
+        const nowSec = Math.floor(Date.now() / 1000);
+        const expDate = new Date(expTimeSec * 1000);
+        const isExpired = nowSec > expTimeSec;
+        this.jwtExpInfo.set({
+          isExpired,
+          dateStr: expDate.toUTCString(),
+          relativeStr: isExpired
+            ? `Expired ${Math.floor((nowSec - expTimeSec) / 60)} minutes ago`
+            : `Valid for ${Math.floor((expTimeSec - nowSec) / 60)} minutes`
+        });
+      }
+    } catch (e: any) {
+      warnings.push(`Payload Parse Error: ${e.message}`);
+    }
+
+    this.jwtSignature.set(parts[2]);
+    this.jwtWarnings.set(warnings);
   }
 }

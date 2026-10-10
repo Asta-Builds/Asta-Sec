@@ -34,6 +34,7 @@ export interface HistoryItem {
   contentType: string;
   durationMs: number;
   size: number;
+  inScope?: boolean;
 }
 
 export interface ScannerIssue {
@@ -83,6 +84,10 @@ export class ProxyService {
   public readonly pendingRequests = signal<InterceptItem[]>([]);
   public readonly history = signal<HistoryItem[]>([]);
   public readonly selectedItem = signal<HistoryItem | null>(null);
+
+  // Scope State (Target Scoping)
+  public readonly scopeRules = signal<string[]>([]);
+  public readonly interceptOnlyInScope = signal<boolean>(true);
 
   // Passive Scanner Issues
   public readonly issues = signal<ScannerIssue[]>([]);
@@ -150,6 +155,19 @@ export class ProxyService {
       }
       if (Array.isArray(msg.data.issues)) {
         this.issues.set(msg.data.issues);
+      }
+      if (Array.isArray(msg.data.scope)) {
+        this.scopeRules.set(msg.data.scope);
+      }
+      if (typeof msg.data.interceptOnlyInScope === 'boolean') {
+        this.interceptOnlyInScope.set(msg.data.interceptOnlyInScope);
+      }
+    } else if (msg.type === 'scope_updated') {
+      if (Array.isArray(msg.rules)) {
+        this.scopeRules.set(msg.rules);
+      }
+      if (typeof msg.interceptOnlyInScope === 'boolean') {
+        this.interceptOnlyInScope.set(msg.interceptOnlyInScope);
       }
     } else if (msg.type === 'intercept_state') {
       this.interceptEnabled.set(!!msg.enabled);
@@ -292,6 +310,18 @@ export class ProxyService {
 
   public sendRepeaterRequest(reqData: { method: string; url: string; headers: Record<string, string>; body: string }): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/api/repeater/send`, reqData);
+  }
+
+  public saveScope(rules: string[], interceptOnlyInScope: boolean): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/api/scope`, { rules, interceptOnlyInScope });
+  }
+
+  public getReportDownloadUrl(): string {
+    return `${this.apiUrl}/api/report/export`;
+  }
+
+  public getReportMarkdown(): Observable<{ markdown: string }> {
+    return this.http.get<{ markdown: string }>(`${this.apiUrl}/api/report/markdown`);
   }
 
   public getRootCaDownloadUrl(): string {
