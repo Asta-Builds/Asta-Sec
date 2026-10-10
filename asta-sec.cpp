@@ -1,17 +1,13 @@
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <sstream>
-#include <vector>
-#include <map>
-#include <csignal>
-#include <cstdint>
-#include <cstring>
-#include <chrono>
-#include <algorithm>
-#include <pcap.h>
-
 #ifdef _WIN32
+  #ifndef NOMINMAX
+    #define NOMINMAX
+  #endif
+  #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+  #endif
+  #ifndef _CRT_SECURE_NO_WARNINGS
+    #define _CRT_SECURE_NO_WARNINGS
+  #endif
   #include <winsock2.h>
   #include <ws2tcpip.h>
   #pragma comment(lib, "ws2_32.lib")
@@ -32,6 +28,19 @@
   #define IS_INVALID_SOCKET(s) ((s) < 0)
   #define CLOSE_SOCKET(s) close(s)
 #endif
+
+#include <iostream>
+#include <iomanip>
+#include <string>
+#include <sstream>
+#include <vector>
+#include <map>
+#include <csignal>
+#include <cstdint>
+#include <cstring>
+#include <chrono>
+#include <algorithm>
+#include <pcap.h>
 
 // ==========================================
 // Protocol Constants & Enums
@@ -356,7 +365,7 @@ HttpInfo parseHttp(const uint8_t* payload, size_t len) {
     HttpInfo info;
     if (len < 4) return info;
 
-    std::string raw(reinterpret_cast<const char*>(payload), std::min(len, size_t(1024)));
+    std::string raw(reinterpret_cast<const char*>(payload), (std::min)(len, static_cast<size_t>(1024)));
 
     if (raw.rfind("GET ", 0) == 0 || raw.rfind("POST ", 0) == 0 ||
         raw.rfind("HEAD ", 0) == 0 || raw.rfind("PUT ", 0) == 0 ||

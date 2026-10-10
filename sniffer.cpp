@@ -1,3 +1,19 @@
+#ifdef _WIN32
+  #ifndef NOMINMAX
+    #define NOMINMAX
+  #endif
+  #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+  #endif
+  #include <winsock2.h>
+  #include <ws2tcpip.h>
+  #pragma comment(lib, "ws2_32.lib")
+#else
+  #include <arpa/inet.h>
+  #include <netinet/in.h>
+  #include <unistd.h>
+#endif
+
 #include <iostream>
 #include <iomanip>
 #include <string>
@@ -7,16 +23,6 @@
 #include <cstdint>
 #include <cstring>
 #include <pcap.h>
-
-#ifdef _WIN32
-  #include <winsock2.h>
-  #include <ws2tcpip.h>
-  #pragma comment(lib, "ws2_32.lib")
-#else
-  #include <arpa/inet.h>
-  #include <netinet/in.h>
-  #include <unistd.h>
-#endif
 
 // Ethernet definitions
 #define ETHER_ADDR_LEN 6
@@ -147,7 +153,7 @@ HttpData parseHttp(const uint8_t* payload, size_t len) {
     HttpData data;
     if (len < 4) return data;
 
-    std::string raw(reinterpret_cast<const char*>(payload), std::min(len, size_t(1024)));
+    std::string raw(reinterpret_cast<const char*>(payload), (std::min)(len, static_cast<size_t>(1024)));
     if (raw.rfind("GET ", 0) == 0 || raw.rfind("POST ", 0) == 0 ||
         raw.rfind("HEAD ", 0) == 0 || raw.rfind("PUT ", 0) == 0 ||
         raw.rfind("DELETE ", 0) == 0 || raw.rfind("OPTIONS ", 0) == 0) {

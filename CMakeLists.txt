@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (WIN32)
+    add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
+
     # Check local npcap-sdk or environment variable
     find_path(PCAP_INCLUDE_DIR pcap.h PATHS "${CMAKE_CURRENT_SOURCE_DIR}/npcap-sdk/Include" "$ENV{NPCAP_SDK}/Include" "C:/Npcap-SDK/Include")
     find_library(PCAP_LIBRARY NAMES wpcap pcap PATHS "${CMAKE_CURRENT_SOURCE_DIR}/npcap-sdk/Lib/x64" "$ENV{NPCAP_SDK}/Lib/x64" "C:/Npcap-SDK/Lib/x64")
