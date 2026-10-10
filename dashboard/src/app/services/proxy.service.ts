@@ -36,6 +36,39 @@ export interface HistoryItem {
   size: number;
 }
 
+export interface ScannerIssue {
+  id: string;
+  ruleId: string;
+  name: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  confidence: 'certain' | 'firm' | 'tentative';
+  host: string;
+  path: string;
+  url: string;
+  method: string;
+  description: string;
+  remediation: string;
+  evidence: string;
+  matchedItemId?: string;
+  timestamp: number;
+}
+
+export interface IntruderResult {
+  id: number;
+  payload: string;
+  status: number;
+  statusText: string;
+  length: number;
+  durationMs: number;
+  isAnomaly: boolean;
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body: string;
+  responseHeaders: Record<string, string>;
+  responseBody: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -50,6 +83,16 @@ export class ProxyService {
   public readonly pendingRequests = signal<InterceptItem[]>([]);
   public readonly history = signal<HistoryItem[]>([]);
   public readonly selectedItem = signal<HistoryItem | null>(null);
+
+  // Passive Scanner Issues
+  public readonly issues = signal<ScannerIssue[]>([]);
+  public readonly selectedIssue = signal<ScannerIssue | null>(null);
+
+  // Intruder Fuzzing State
+  public readonly intruderResults = signal<IntruderResult[]>([]);
+  public readonly selectedIntruderResult = signal<IntruderResult | null>(null);
+  public readonly intruderRunning = signal<boolean>(false);
+  public readonly intruderProgress = signal<{ current: number; total: number }>({ current: 0, total: 0 });
 
   constructor(private http: HttpClient) {
     const isDev = window.location.port === '4200';
@@ -105,6 +148,9 @@ export class ProxyService {
       if (Array.isArray(msg.data.pending)) {
         this.pendingRequests.set(msg.data.pending);
       }
+      if (Array.isArray(msg.data.issues)) {
+        this.issues.set(msg.data.issues);
+      }
     } else if (msg.type === 'intercept_state') {
       this.interceptEnabled.set(!!msg.enabled);
     } else if (msg.type === 'intercept_request') {
@@ -119,6 +165,21 @@ export class ProxyService {
     } else if (msg.type === 'history_cleared') {
       this.history.set([]);
       this.selectedItem.set(null);
+    } else if (msg.type === 'scanner_issue') {
+      const current = this.issues();
+      this.issues.set([msg.data, ...current]);
+    } else if (msg.type === 'issues_cleared') {
+      this.issues.set([]);
+      this.selectedIssue.set(null);
+    } else if (msg.type === 'intruder_result') {
+      const current = this.intruderResults();
+      this.intruderResults.set([msg.data, ...current]);
+      const prog = this.intruderProgress();
+      this.intruderProgress.set({ current: prog.current + 1, total: prog.total });
+    } else if (msg.type === 'intruder_complete') {
+      this.intruderRunning.set(false);
+    } else if (msg.type === 'intruder_stopped') {
+      this.intruderRunning.set(false);
     }
   }
 
@@ -134,6 +195,15 @@ export class ProxyService {
       next: (list) => {
         if (Array.isArray(list)) {
           this.history.set(list);
+        }
+      },
+      error: () => {}
+    });
+
+    this.http.get<ScannerIssue[]>(`${this.apiUrl}/api/issues`).subscribe({
+      next: (list) => {
+        if (Array.isArray(list)) {
+          this.issues.set(list);
         }
       },
       error: () => {}
@@ -180,6 +250,42 @@ export class ProxyService {
       next: () => {
         this.history.set([]);
         this.selectedItem.set(null);
+      }
+    });
+  }
+
+  public clearIssues() {
+    this.http.delete<any>(`${this.apiUrl}/api/issues`).subscribe({
+      next: () => {
+        this.issues.set([]);
+        this.selectedIssue.set(null);
+      }
+    });
+  }
+
+  public getIntruderPresets(): Observable<Record<string, string[]>> {
+    return this.http.get<Record<string, string[]>>(`${this.apiUrl}/api/intruder/presets`);
+  }
+
+  public startIntruder(config: {
+    templateUrl: string;
+    method: string;
+    headers: Record<string, string>;
+    bodyTemplate: string;
+    payloads: string[];
+    concurrency?: number;
+  }): Observable<any> {
+    this.intruderResults.set([]);
+    this.selectedIntruderResult.set(null);
+    this.intruderRunning.set(true);
+    this.intruderProgress.set({ current: 0, total: config.payloads.length });
+    return this.http.post<any>(`${this.apiUrl}/api/intruder/start`, config);
+  }
+
+  public stopIntruder() {
+    this.http.post<any>(`${this.apiUrl}/api/intruder/stop`, {}).subscribe({
+      next: () => {
+        this.intruderRunning.set(false);
       }
     });
   }

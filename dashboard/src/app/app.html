@@ -7,7 +7,7 @@
       </svg>
       <div class="brand-text">
         <span class="brand-title">ASTA-SEC</span>
-        <span class="brand-subtitle">INTERCEPTING PROXY v2.0</span>
+        <span class="brand-subtitle">SECURITY SUITE &amp; PROXY v2.0</span>
       </div>
     </div>
 
@@ -44,6 +44,24 @@
 
       <button 
         class="tab-btn" 
+        [class.active]="activeTab() === 'issues'" 
+        (click)="activeTab.set('issues')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>Issues</span>
+        <span class="badge badge-critical" *ngIf="issueStats().critical > 0">
+          {{ issueStats().critical }}
+        </span>
+        <span class="badge badge-neutral" *ngIf="issueStats().critical === 0 && proxyService.issues().length > 0">
+          {{ proxyService.issues().length }}
+        </span>
+      </button>
+
+      <button 
+        class="tab-btn" 
         [class.active]="activeTab() === 'repeater'" 
         (click)="activeTab.set('repeater')">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -51,6 +69,23 @@
           <polygon points="22 2 15 22 11 13 2 9 22 2"/>
         </svg>
         <span>Repeater</span>
+      </button>
+
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab() === 'intruder'" 
+        (click)="activeTab.set('intruder')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="22" y1="12" x2="18" y2="12"/>
+          <line x1="6" y1="12" x2="2" y2="12"/>
+          <line x1="12" y1="6" x2="12" y2="2"/>
+          <line x1="12" y1="22" x2="12" y2="18"/>
+        </svg>
+        <span>Intruder</span>
+        <span class="badge badge-warning" *ngIf="proxyService.intruderRunning()">
+          RUNNING
+        </span>
       </button>
 
       <button 
@@ -316,13 +351,25 @@
               <span class="method-tag method-{{ sel.method }}">{{ sel.method }}</span>
               <span class="url-label" [title]="sel.url">{{ sel.url }}</span>
             </div>
-            <button class="action-btn repeater-btn" (click)="sendToRepeater(sel)">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="22" y1="2" x2="11" y2="13"/>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
-              <span>Send to Repeater</span>
-            </button>
+            <div class="inspector-actions">
+              <button class="action-btn repeater-btn" (click)="sendToRepeater(sel)">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+                <span>Send to Repeater</span>
+              </button>
+              <button class="action-btn intruder-btn" (click)="sendToIntruder(sel)">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="22" y1="12" x2="18" y2="12"/>
+                  <line x1="6" y1="12" x2="2" y2="12"/>
+                  <line x1="12" y1="6" x2="12" y2="2"/>
+                  <line x1="12" y1="22" x2="12" y2="18"/>
+                </svg>
+                <span>Send to Intruder</span>
+              </button>
+            </div>
           </div>
 
           <div class="inspector-panes">
@@ -409,7 +456,372 @@
     </section>
 
     <!-- ============================================== -->
-    <!-- TAB 3: REPEATER VIEW                           -->
+    <!-- TAB 3: PASSIVE SCANNER ISSUES VIEW             -->
+    <!-- ============================================== -->
+    <section class="tab-pane issues-pane" *ngIf="activeTab() === 'issues'">
+      <!-- Issues Metric KPI Bar -->
+      <div class="issues-stats-bar">
+        <div class="kpi-group">
+          <div class="kpi-badge kpi-critical">
+            <span class="kpi-num">{{ issueStats().critical }}</span>
+            <span class="kpi-label">Critical</span>
+          </div>
+          <div class="kpi-badge kpi-high">
+            <span class="kpi-num">{{ issueStats().high }}</span>
+            <span class="kpi-label">High</span>
+          </div>
+          <div class="kpi-badge kpi-medium">
+            <span class="kpi-num">{{ issueStats().medium }}</span>
+            <span class="kpi-label">Medium</span>
+          </div>
+          <div class="kpi-badge kpi-low">
+            <span class="kpi-num">{{ issueStats().low }}</span>
+            <span class="kpi-label">Low</span>
+          </div>
+          <div class="kpi-badge kpi-info">
+            <span class="kpi-num">{{ issueStats().info }}</span>
+            <span class="kpi-label">Info</span>
+          </div>
+        </div>
+
+        <div class="issues-actions">
+          <div class="filter-chips">
+            <button class="chip" [class.active]="severityFilter() === 'all'" (click)="severityFilter.set('all')">
+              All ({{ proxyService.issues().length }})
+            </button>
+            <button class="chip" [class.active]="severityFilter() === 'critical'" (click)="severityFilter.set('critical')">
+              Critical
+            </button>
+            <button class="chip" [class.active]="severityFilter() === 'high'" (click)="severityFilter.set('high')">
+              High
+            </button>
+            <button class="chip" [class.active]="severityFilter() === 'medium'" (click)="severityFilter.set('medium')">
+              Medium
+            </button>
+            <button class="chip" [class.active]="severityFilter() === 'low'" (click)="severityFilter.set('low')">
+              Low
+            </button>
+          </div>
+
+          <button class="btn-text danger-text" (click)="proxyService.clearIssues()">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            <span>Clear Issues</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Split Issue List and Detail Inspector -->
+      <div class="issues-split-view">
+        <!-- Left: Issue Findings List -->
+        <div class="issues-list-container">
+          <div 
+            class="issue-list-card" 
+            *ngFor="let iss of filteredIssues()" 
+            [class.selected]="proxyService.selectedIssue()?.id === iss.id"
+            (click)="selectIssue(iss)">
+            <div class="card-title-row">
+              <span class="severity-badge sev-{{ iss.severity }}">{{ iss.severity }}</span>
+              <span class="issue-name">{{ iss.name }}</span>
+            </div>
+            <div class="card-meta-row">
+              <span class="issue-endpoint">{{ iss.host }}{{ iss.path }}</span>
+              <span class="issue-time">{{ iss.timestamp | date:'HH:mm:ss' }}</span>
+            </div>
+          </div>
+
+          <div class="empty-state" *ngIf="filteredIssues().length === 0">
+            <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <polyline points="9 12 11 14 15 10"/>
+            </svg>
+            <h4>No Security Findings</h4>
+            <p>Passive scanner analyzes every proxied request in real-time for leaked secrets, missing HSTS, CSP flaws, and insecure cookies.</p>
+          </div>
+        </div>
+
+        <!-- Right: Detailed Issue Remediation Pane -->
+        <div class="issue-detail-container" *ngIf="proxyService.selectedIssue() as curIssue">
+          <div class="detail-header">
+            <div class="detail-title-flex">
+              <span class="severity-badge sev-{{ curIssue.severity }}">{{ curIssue.severity }}</span>
+              <span class="confidence-tag">{{ curIssue.confidence }} confidence</span>
+              <span class="rule-id-tag">{{ curIssue.ruleId }}</span>
+            </div>
+            <h2>{{ curIssue.name }}</h2>
+            <div class="detail-url-box">
+              <span class="method-tag method-{{ curIssue.method }}">{{ curIssue.method }}</span>
+              <code>{{ curIssue.url }}</code>
+            </div>
+          </div>
+
+          <div class="detail-body">
+            <div class="detail-section">
+              <h4 class="section-title">Vulnerability Description</h4>
+              <p class="description-text">{{ curIssue.description }}</p>
+            </div>
+
+            <div class="detail-section" *ngIf="curIssue.evidence">
+              <h4 class="section-title">Detected Evidence</h4>
+              <pre class="evidence-box">{{ curIssue.evidence }}</pre>
+            </div>
+
+            <div class="detail-section">
+              <h4 class="section-title">Recommended Remediation</h4>
+              <div class="remediation-box">
+                <svg class="remed-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <polyline points="9 12 11 14 15 10"/>
+                </svg>
+                <p>{{ curIssue.remediation }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="inspector-placeholder" *ngIf="!proxyService.selectedIssue()">
+          <p>Select any security issue from the list to view vulnerability details, evidence, and remediation advice.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- TAB 4: INTRUDER / PARAMETER FUZZING VIEW       -->
+    <!-- ============================================== -->
+    <section class="tab-pane intruder-pane" *ngIf="activeTab() === 'intruder'">
+      <!-- Intruder Top Config Bar -->
+      <div class="intruder-config-bar">
+        <select class="method-select" [ngModel]="intruderMethod()" (ngModelChange)="intruderMethod.set($event)">
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+          <option value="PUT">PUT</option>
+          <option value="DELETE">DELETE</option>
+          <option value="PATCH">PATCH</option>
+        </select>
+
+        <div class="url-input-wrap">
+          <input 
+            type="text" 
+            class="url-input" 
+            placeholder="Target URL with markers, e.g. https://target.com/api?user=§FUZZ§"
+            [ngModel]="intruderUrl()" 
+            (ngModelChange)="intruderUrl.set($event)" />
+          <button class="marker-btn" title="Add payload marker (§FUZZ§)" (click)="addMarkerToUrl()">
+            + Marker (§)
+          </button>
+        </div>
+
+        <div class="concurrency-wrap">
+          <label class="control-label">Threads:</label>
+          <input 
+            type="number" 
+            class="num-input" 
+            min="1" 
+            max="25"
+            [ngModel]="intruderConcurrency()" 
+            (ngModelChange)="intruderConcurrency.set($event)" />
+        </div>
+
+        <button 
+          class="action-btn intruder-run-btn" 
+          *ngIf="!proxyService.intruderRunning()" 
+          (click)="startIntruder()">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          <span>Start Attack</span>
+        </button>
+
+        <button 
+          class="action-btn drop-btn" 
+          *ngIf="proxyService.intruderRunning()" 
+          (click)="stopIntruder()">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="6" y="4" width="4" height="16"/>
+            <rect x="14" y="4" width="4" height="16"/>
+          </svg>
+          <span>Stop Attack</span>
+        </button>
+      </div>
+
+      <!-- Intruder Workspace Layout -->
+      <div class="intruder-workspace">
+        <!-- Left: Configuration & Payloads Column -->
+        <div class="intruder-config-column">
+          <!-- Preset Payloads Dropdown -->
+          <div class="config-block">
+            <div class="block-header">
+              <label class="section-label">Payload Presets</label>
+            </div>
+            <div class="preset-chips">
+              <button 
+                class="chip" 
+                [class.active]="intruderSelectedPreset() === 'common_paths'"
+                (click)="applyPreset('common_paths')">
+                Paths
+              </button>
+              <button 
+                class="chip" 
+                [class.active]="intruderSelectedPreset() === 'sqli_vectors'"
+                (click)="applyPreset('sqli_vectors')">
+                SQLi
+              </button>
+              <button 
+                class="chip" 
+                [class.active]="intruderSelectedPreset() === 'xss_vectors'"
+                (click)="applyPreset('xss_vectors')">
+                XSS
+              </button>
+              <button 
+                class="chip" 
+                [class.active]="intruderSelectedPreset() === 'path_traversal'"
+                (click)="applyPreset('path_traversal')">
+                Traversal
+              </button>
+              <button 
+                class="chip" 
+                [class.active]="intruderSelectedPreset() === 'numbers_1_25'"
+                (click)="applyPreset('numbers_1_25')">
+                1-25
+              </button>
+            </div>
+          </div>
+
+          <!-- Payloads List Editor -->
+          <div class="config-block payloads-block">
+            <label class="section-label">Payloads List (One per line)</label>
+            <textarea 
+              class="code-editor" 
+              placeholder="admin&#10;test&#10;dev&#10;backup"
+              [ngModel]="intruderPayloadsText()" 
+              (ngModelChange)="intruderPayloadsText.set($event)"></textarea>
+          </div>
+
+          <!-- Request Body / Headers Tab -->
+          <div class="config-block" style="flex: 1; display: flex; flex-direction: column;">
+            <label class="section-label">HTTP Body Template (Optional)</label>
+            <textarea 
+              class="code-editor" 
+              style="flex: 1;" 
+              placeholder="e.g. { &quot;username&quot;: &quot;§FUZZ§&quot; }"
+              [ngModel]="intruderBody()" 
+              (ngModelChange)="intruderBody.set($event)"></textarea>
+          </div>
+        </div>
+
+        <!-- Right: Real-time Attack Matrix Table & Inspector -->
+        <div class="intruder-results-column">
+          <div class="results-table-wrap">
+            <table class="traffic-table">
+              <thead>
+                <tr>
+                  <th style="width: 45px;">#</th>
+                  <th style="width: 180px;">Payload</th>
+                  <th style="width: 75px;">Status</th>
+                  <th style="width: 80px;">Length</th>
+                  <th style="width: 75px;">Time</th>
+                  <th style="width: 85px;">Anomaly</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr 
+                  *ngFor="let res of proxyService.intruderResults()" 
+                  [class.selected]="proxyService.selectedIntruderResult()?.id === res.id"
+                  [class.anomaly-row]="res.isAnomaly"
+                  (click)="selectIntruderResult(res)">
+                  <td class="col-num">{{ res.id }}</td>
+                  <td class="col-payload" [title]="res.payload">{{ res.payload }}</td>
+                  <td>
+                    <span 
+                      class="status-tag" 
+                      [class.status-2xx]="res.status >= 200 && res.status < 300"
+                      [class.status-3xx]="res.status >= 300 && res.status < 400"
+                      [class.status-4xx]="res.status >= 400 && res.status < 500"
+                      [class.status-5xx]="res.status >= 500">
+                      {{ res.status }}
+                    </span>
+                  </td>
+                  <td class="col-meta">{{ res.length }} B</td>
+                  <td class="col-meta">{{ res.durationMs }} ms</td>
+                  <td>
+                    <span class="anomaly-tag" *ngIf="res.isAnomaly">DIFF</span>
+                  </td>
+                </tr>
+                <tr *ngIf="proxyService.intruderResults().length === 0">
+                  <td colspan="6" class="empty-table-row">
+                    No attack executed yet. Select payloads and click <strong>Start Attack</strong>.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Bottom: Inspector for Selected Intruder Result -->
+          <div class="intruder-inspector-wrap" *ngIf="proxyService.selectedIntruderResult() as curRes">
+            <div class="inspector-panes">
+              <div class="pane-column">
+                <div class="pane-tabs">
+                  <span class="pane-title">Request (Payload: {{ curRes.payload }})</span>
+                  <button 
+                    class="subtab-btn" 
+                    [class.active]="intruderResultReqView() === 'headers'" 
+                    (click)="intruderResultReqView.set('headers')">Headers</button>
+                  <button 
+                    class="subtab-btn" 
+                    [class.active]="intruderResultReqView() === 'body'" 
+                    (click)="intruderResultReqView.set('body')">Body</button>
+                </div>
+                <div class="pane-content" *ngIf="intruderResultReqView() === 'headers'">
+                  <div class="kv-table">
+                    <div class="kv-row" *ngFor="let kv of curRes.headers | keyvalue">
+                      <span class="kv-key">{{ kv.key }}:</span>
+                      <span class="kv-val">{{ kv.value }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="pane-content" *ngIf="intruderResultReqView() === 'body'">
+                  <pre class="raw-code">{{ curRes.body || '[No request body]' }}</pre>
+                </div>
+              </div>
+
+              <div class="pane-column">
+                <div class="pane-tabs">
+                  <span class="pane-title">Response ({{ curRes.status }} {{ curRes.statusText }})</span>
+                  <button 
+                    class="subtab-btn" 
+                    [class.active]="intruderResultResView() === 'body'" 
+                    (click)="intruderResultResView.set('body')">Body</button>
+                  <button 
+                    class="subtab-btn" 
+                    [class.active]="intruderResultResView() === 'headers'" 
+                    (click)="intruderResultResView.set('headers')">Headers</button>
+                </div>
+                <div class="pane-content" *ngIf="intruderResultResView() === 'body'">
+                  <pre class="raw-code">{{ curRes.responseBody || '[No response body]' }}</pre>
+                </div>
+                <div class="pane-content" *ngIf="intruderResultResView() === 'headers'">
+                  <div class="kv-table">
+                    <div class="kv-row" *ngFor="let kv of curRes.responseHeaders | keyvalue">
+                      <span class="kv-key">{{ kv.key }}:</span>
+                      <span class="kv-val">{{ kv.value }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="inspector-placeholder" *ngIf="!proxyService.selectedIntruderResult() && proxyService.intruderResults().length > 0">
+            <p>Select any result from the attack table above to inspect the customized request and response.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- TAB 5: REPEATER VIEW                           -->
     <!-- ============================================== -->
     <section class="tab-pane repeater-pane" *ngIf="activeTab() === 'repeater'">
       <!-- Repeater Control Bar -->
@@ -505,7 +917,7 @@
     </section>
 
     <!-- ============================================== -->
-    <!-- TAB 4: DECODER VIEW                            -->
+    <!-- TAB 6: DECODER VIEW                            -->
     <!-- ============================================== -->
     <section class="tab-pane decoder-pane" *ngIf="activeTab() === 'decoder'">
       <div class="decoder-layout">
@@ -552,7 +964,7 @@
     </section>
 
     <!-- ============================================== -->
-    <!-- TAB 5: SETUP & CA GUIDE                        -->
+    <!-- TAB 7: SETUP & CA GUIDE                        -->
     <!-- ============================================== -->
     <section class="tab-pane setup-pane" *ngIf="activeTab() === 'setup'">
       <div class="setup-grid">

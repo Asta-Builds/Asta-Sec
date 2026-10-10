@@ -1,7 +1,7 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ProxyService, HistoryItem, InterceptItem } from './services/proxy.service';
+import { ProxyService, HistoryItem, InterceptItem, ScannerIssue, IntruderResult } from './services/proxy.service';
 
 @Component({
   selector: 'app-root',
@@ -10,11 +10,11 @@ import { ProxyService, HistoryItem, InterceptItem } from './services/proxy.servi
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
-export class App {
+export class App implements OnInit {
   public proxyService = inject(ProxyService);
 
   // Active navigation tab
-  public activeTab = signal<'intercept' | 'history' | 'repeater' | 'decoder' | 'setup'>('history');
+  public activeTab = signal<'intercept' | 'history' | 'repeater' | 'intruder' | 'issues' | 'decoder' | 'setup'>('history');
 
   // History search and filtering
   public searchQuery = signal<string>('');
@@ -62,12 +62,53 @@ export class App {
   public repeaterLoading = signal<boolean>(false);
   public repeaterResponse = signal<any | null>(null);
 
+  // Intruder (Fuzzing) State
+  public intruderMethod = signal<string>('GET');
+  public intruderUrl = signal<string>('https://httpbin.org/get?user=§FUZZ§');
+  public intruderHeaders = signal<string>('User-Agent: ASTA-SEC-Intruder/2.0\nAccept: application/json');
+  public intruderBody = signal<string>('');
+  public intruderPayloadsText = signal<string>('admin\nlogin\ntest\ndev\nsecret');
+  public intruderConcurrency = signal<number>(5);
+  public intruderSelectedPreset = signal<string>('');
+  public presetsList = signal<Record<string, string[]>>({});
+  public intruderResultReqView = signal<'headers' | 'raw' | 'body'>('headers');
+  public intruderResultResView = signal<'headers' | 'raw' | 'body'>('body');
+
+  // Passive Scanner Issues State
+  public severityFilter = signal<'all' | 'critical' | 'high' | 'medium' | 'low' | 'info'>('all');
+
+  public filteredIssues = computed(() => {
+    const list = this.proxyService.issues();
+    const sev = this.severityFilter();
+    if (sev === 'all') return list;
+    return list.filter(i => i.severity === sev);
+  });
+
+  public issueStats = computed(() => {
+    const list = this.proxyService.issues();
+    return {
+      critical: list.filter(i => i.severity === 'critical').length,
+      high: list.filter(i => i.severity === 'high').length,
+      medium: list.filter(i => i.severity === 'medium').length,
+      low: list.filter(i => i.severity === 'low').length,
+      info: list.filter(i => i.severity === 'info').length,
+      total: list.length
+    };
+  });
+
   // Decoder State
   public decoderInput = signal<string>('');
   public decoderOutput = signal<string>('');
   public decoderActiveAction = signal<string>('');
 
-  constructor() {}
+  ngOnInit() {
+    this.proxyService.getIntruderPresets().subscribe({
+      next: (presets) => {
+        if (presets) this.presetsList.set(presets);
+      },
+      error: () => {}
+    });
+  }
 
   // ----------------------------------------
   // Intercept Actions
@@ -96,7 +137,6 @@ export class App {
     const item = this.currentInterceptItem;
     if (!item) return;
 
-    // Parse edited headers
     const rawHdr = this.interceptEditHeaders();
     const parsedHeaders: Record<string, string> = {};
     const lines = rawHdr.split('\n');
@@ -142,6 +182,26 @@ export class App {
     this.repeaterResponse.set(null);
 
     this.activeTab.set('repeater');
+  }
+
+  public sendToIntruder(item: HistoryItem) {
+    this.intruderMethod.set(item.method);
+    let markedUrl = item.url;
+    if (markedUrl.includes('=')) {
+      markedUrl = markedUrl.replace(/=([^&]+)/, '=§$1§');
+    } else {
+      markedUrl += markedUrl.includes('?') ? '&param=§FUZZ§' : '?param=§FUZZ§';
+    }
+    this.intruderUrl.set(markedUrl);
+
+    let hdrs = '';
+    for (const [k, v] of Object.entries(item.requestHeaders)) {
+      hdrs += `${k}: ${v}\n`;
+    }
+    this.intruderHeaders.set(hdrs.trim());
+    this.intruderBody.set(item.requestBody || '');
+
+    this.activeTab.set('intruder');
   }
 
   public formatRawRequest(item: HistoryItem): string {
@@ -209,6 +269,74 @@ export class App {
         });
       }
     });
+  }
+
+  // ----------------------------------------
+  // Intruder Actions
+  // ----------------------------------------
+  public applyPreset(name: string) {
+    const list = this.presetsList()[name];
+    if (list && list.length > 0) {
+      this.intruderPayloadsText.set(list.join('\n'));
+      this.intruderSelectedPreset.set(name);
+    }
+  }
+
+  public addMarkerToUrl() {
+    const curr = this.intruderUrl();
+    this.intruderUrl.set(curr + '§FUZZ§');
+  }
+
+  public startIntruder() {
+    const rawHdrs = this.intruderHeaders();
+    const headers: Record<string, string> = {};
+    const lines = rawHdrs.split('\n');
+    for (const l of lines) {
+      const idx = l.indexOf(':');
+      if (idx > 0) {
+        const k = l.substring(0, idx).trim().toLowerCase();
+        const v = l.substring(idx + 1).trim();
+        headers[k] = v;
+      }
+    }
+
+    const payloads = this.intruderPayloadsText()
+      .split('\n')
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+
+    if (payloads.length === 0) {
+      alert('Please enter at least one payload to launch the Intruder attack.');
+      return;
+    }
+
+    this.proxyService.startIntruder({
+      templateUrl: this.intruderUrl(),
+      method: this.intruderMethod(),
+      headers,
+      bodyTemplate: this.intruderBody(),
+      payloads,
+      concurrency: this.intruderConcurrency()
+    }).subscribe({
+      error: (err) => {
+        console.error('Failed to start intruder', err);
+      }
+    });
+  }
+
+  public stopIntruder() {
+    this.proxyService.stopIntruder();
+  }
+
+  public selectIntruderResult(item: IntruderResult) {
+    this.proxyService.selectedIntruderResult.set(item);
+  }
+
+  // ----------------------------------------
+  // Issues Actions
+  // ----------------------------------------
+  public selectIssue(issue: ScannerIssue) {
+    this.proxyService.selectedIssue.set(issue);
   }
 
   // ----------------------------------------

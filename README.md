@@ -58,7 +58,9 @@ A full-featured developer & security auditing intercepting proxy with a modern A
 - **Interactive Interception (Intercept ON/OFF):** Pause pending HTTP/HTTPS requests in real-time, inspect headers and payloads, and **Forward**, **Drop**, or **Modify** before sending upstream.
 - **Live HTTP History Table:** Full searchable, filterable transaction table with split-pane inspector for raw and parsed Request/Response headers and bodies.
 - **Repeater Component:** Craft custom HTTP requests, fire them upstream, and inspect live responses with millisecond latency measurement.
-- **Decoder Utility:** Quick transformations for URL, Base64, Hex encoding/decoding, and MD5/SHA256 hashes.
+- **Intruder / Parameter Fuzzing Engine:** Multi-threaded parameter fuzzing with configurable concurrency, payload markers (`§...§`), built-in attack vector presets (paths, SQLi, XSS, traversal, numbers), and real-time response length anomaly detection.
+- **Passive Security Scanner (Issue Tracker):** Automatically inspects all incoming/outgoing traffic in real-time for exposed cloud credentials (AWS keys, GitHub tokens, private keys), insecure cookies (missing `HttpOnly`, `Secure`, `SameSite`), wildcard CORS with credentials, sensitive query parameters in GET requests, missing Clickjacking protection, missing HSTS, and framework version disclosure.
+- **Decoder Utility:** Quick transformations for URL, Base64, Hex encoding/decoding.
 - **Angular Dashboard:** Runs on `http://127.0.0.1:8081` with WebSocket streaming and Lucide SVG icons (zero emojis).
 
 ---
