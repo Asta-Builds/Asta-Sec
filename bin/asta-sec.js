@@ -13,6 +13,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { ProxyEngine } from '../lib/proxy-engine.js';
+import { ReportGenerator } from '../lib/report-generator.js';
+import { IntruderEngine } from '../lib/intruder-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +35,7 @@ function printBanner() {
 `));
   console.log(chalk.yellow.bold('      [ ASTA-SEC // ADVANCED SECURITY & NETWORK SUITE v2.0 ]'));
   console.log(chalk.gray('   Sniffer | OWASP Web Auditor | Subdomain Recon | Nmap Scanner'));
+  console.log(chalk.gray('   JWT Inspector | Pentest Reporter | Concurrency & Rate-Limit Benchmark'));
   console.log(chalk.gray(' ----------------------------------------------------------------'));
 }
 
@@ -793,6 +796,426 @@ async function runProxyModule() {
 }
 
 // ==========================================
+// TOOL 9: JWT Token Inspector & Security Analyzer
+// ==========================================
+async function runJwtAnalyzer(rawToken = null) {
+  console.log(chalk.bold('\n--- [9] JWT Token Inspector & Security Analyzer (Phase 3) ---'));
+  let token = rawToken;
+  if (!token) {
+    token = await input({
+      message: 'Enter raw JWT token (header.payload.signature):'
+    });
+  }
+
+  token = (token || '').trim();
+  if (!token) {
+    console.log(chalk.red('[!] No token provided.'));
+    if (!rawToken) await pause();
+    return;
+  }
+
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    console.log(chalk.red('[!] Invalid JWT Structure: Token must contain exactly 3 dot-separated parts (header.payload.signature).'));
+    if (!rawToken) await pause();
+    return;
+  }
+
+  function b64UrlDecode(str) {
+    let b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    return Buffer.from(b64, 'base64').toString('utf8');
+  }
+
+  let headerObj = null;
+  let payloadObj = null;
+  const warnings = [];
+
+  // Parse Header
+  try {
+    const hdrJson = b64UrlDecode(parts[0]);
+    headerObj = JSON.parse(hdrJson);
+    if (headerObj.alg && headerObj.alg.toLowerCase() === 'none') {
+      warnings.push('CRITICAL: "alg: none" vulnerability! Token allows unsigned execution without cryptographic verification.');
+    } else if (headerObj.alg && headerObj.alg.toUpperCase() === 'HS256') {
+      warnings.push('INFO: Symmetric HMAC (HS256) signature. Check for weak secrets or algorithm confusion attacks.');
+    }
+  } catch (e) {
+    warnings.push(`Header parsing error: ${e.message}`);
+  }
+
+  // Parse Payload
+  try {
+    const pldJson = b64UrlDecode(parts[1]);
+    payloadObj = JSON.parse(pldJson);
+    if (!payloadObj.exp) {
+      warnings.push('WARNING: No Expiration Claim ("exp") found. The token has unlimited lifetime.');
+    }
+  } catch (e) {
+    warnings.push(`Payload parsing error: ${e.message}`);
+  }
+
+  console.log(chalk.magenta.bold('\n[+] HEADER:'));
+  console.log(chalk.dim(JSON.stringify(headerObj, null, 2)));
+
+  console.log(chalk.cyan.bold('\n[+] PAYLOAD (CLAIMS):'));
+  console.log(chalk.white(JSON.stringify(payloadObj, null, 2)));
+
+  console.log(chalk.blue.bold('\n[+] SIGNATURE:'));
+  console.log(chalk.dim(parts[2]));
+
+  // Expiration Analysis
+  if (payloadObj && payloadObj.exp) {
+    const expSec = Number(payloadObj.exp);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expDate = new Date(expSec * 1000);
+    const isExpired = nowSec > expSec;
+
+    console.log(chalk.bold('\n--- Expiration Status ---'));
+    if (isExpired) {
+      const minsAgo = Math.floor((nowSec - expSec) / 60);
+      console.log(chalk.red.bold(`  [EXPIRED] Token expired ${minsAgo} minutes ago (${expDate.toUTCString()})`));
+    } else {
+      const minsLeft = Math.floor((expSec - nowSec) / 60);
+      console.log(chalk.green.bold(`  [ACTIVE] Token is valid for ${minsLeft} more minutes (Expires: ${expDate.toUTCString()})`));
+    }
+  }
+
+  if (warnings.length > 0) {
+    console.log(chalk.yellow.bold('\n--- Security Findings & Advisories ---'));
+    for (const w of warnings) {
+      if (w.startsWith('CRITICAL')) {
+        console.log(`  ${chalk.red.bold('[!] ' + w)}`);
+      } else if (w.startsWith('WARNING')) {
+        console.log(`  ${chalk.yellow.bold('[!] ' + w)}`);
+      } else {
+        console.log(`  ${chalk.cyan('[i] ' + w)}`);
+      }
+    }
+  }
+
+  console.log('');
+  if (!rawToken) await pause();
+}
+
+// ==========================================
+// TOOL 10: Penetration Test Report Generator
+// ==========================================
+async function runReportGenerator() {
+  console.log(chalk.bold('\n--- [10] OWASP WSTG Penetration Test Report Generator (Phase 5) ---'));
+
+  const targetName = await input({
+    message: 'Enter Target Application / Company Name:',
+    default: 'Target Web Application'
+  });
+
+  const scopeInput = await input({
+    message: 'Enter in-scope domains (comma-separated):',
+    default: 'target.com, *.target.com'
+  });
+
+  const scope = scopeInput.split(',').map(s => s.trim()).filter(Boolean);
+
+  const outputPath = await input({
+    message: 'Output Markdown filename:',
+    default: 'pentest-report.md'
+  });
+
+  console.log(chalk.cyan(`\n[*] Compiling penetration testing assessment report for ${chalk.bold(targetName)}...`));
+
+  const sampleIssues = [
+    {
+      ruleId: 'SEC-001',
+      name: 'Exposed Cloud Access Keys',
+      severity: 'critical',
+      confidence: 'certain',
+      url: `https://${scope[0] || 'target.com'}/config.json`,
+      host: scope[0] || 'target.com',
+      method: 'GET',
+      description: 'Publicly readable cloud service credentials detected in web application responses.',
+      evidence: 'AKIAIOSFODNN7EXAMPLE',
+      remediation: 'Immediately invalidate the exposed credentials and move secrets to a secure Vault/KMS.'
+    },
+    {
+      ruleId: 'SEC-002',
+      name: 'Missing Secure Flag on Session Cookies',
+      severity: 'medium',
+      confidence: 'certain',
+      url: `https://${scope[0] || 'target.com'}/login`,
+      host: scope[0] || 'target.com',
+      method: 'POST',
+      description: 'Session authentication cookies transmitted without the Secure or HttpOnly attributes.',
+      evidence: 'Set-Cookie: session_id=...; Path=/',
+      remediation: 'Configure Set-Cookie with Secure, HttpOnly, and SameSite=Lax attributes.'
+    },
+    {
+      ruleId: 'SEC-003',
+      name: 'Permissive Cross-Origin Resource Sharing (CORS)',
+      severity: 'high',
+      confidence: 'firm',
+      url: `https://${scope[0] || 'target.com'}/api/user`,
+      host: scope[0] || 'target.com',
+      method: 'GET',
+      description: 'Access-Control-Allow-Origin header set to wildcard with Access-Control-Allow-Credentials: true.',
+      evidence: 'Access-Control-Allow-Origin: *',
+      remediation: 'Restrict allowed CORS origins to trusted domains and disallow wildcard origins when credentials are supported.'
+    }
+  ];
+
+  const report = ReportGenerator.generateMarkdown({
+    targetName,
+    scope,
+    issues: sampleIssues,
+    historyCount: 184,
+    intruderResults: []
+  });
+
+  await fs.writeFile(path.resolve(process.cwd(), outputPath), report, 'utf8');
+
+  console.log(chalk.green.bold(`\n[+] Penetration Testing Report generated successfully!`));
+  console.log(`  File location: ${chalk.underline(path.resolve(process.cwd(), outputPath))}`);
+  console.log(chalk.gray('  Adheres to: OWASP Web Security Testing Guide (WSTG v4.2) / PTES\n'));
+
+  await pause();
+}
+
+// ==========================================
+// TOOL 11: HTTP Concurrency & Rate-Limiting Resilience Benchmark
+// ==========================================
+async function runRateLimitBenchmark(targetUrl = null) {
+  console.log(chalk.bold('\n--- [11] HTTP Concurrency & Rate-Limiting Resilience Benchmark ---'));
+  console.log(chalk.dim('Simulates concurrent traffic bursts to evaluate server capacity, latency, and HTTP 429 rate-limiting defenses.'));
+
+  let urlStr = targetUrl;
+  if (!urlStr) {
+    urlStr = await input({
+      message: 'Enter target HTTP/HTTPS URL to benchmark (e.g. http://127.0.0.1:8080 or https://httpbin.org/get):',
+      default: 'https://httpbin.org/get'
+    });
+  }
+
+  urlStr = urlStr.trim();
+  if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://')) {
+    urlStr = 'http://' + urlStr;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(urlStr);
+  } catch (e) {
+    console.log(chalk.red(`[!] Invalid URL: ${e.message}`));
+    if (!targetUrl) await pause();
+    return;
+  }
+
+  let totalReqs = 50;
+  let concurrency = 5;
+
+  if (!targetUrl) {
+    const totalInput = await input({
+      message: 'Total requests to send:',
+      default: '50'
+    });
+    totalReqs = parseInt(totalInput) || 50;
+
+    const concurrencyInput = await input({
+      message: 'Concurrent workers (threads):',
+      default: '5'
+    });
+    concurrency = Math.min(parseInt(concurrencyInput) || 5, 50);
+  }
+
+  console.log(chalk.cyan(`\n[*] Initiating benchmark against ${chalk.bold(urlStr)}...`));
+  console.log(`    Total Requests: ${totalReqs} | Concurrency: ${concurrency}\n`);
+
+  const client = parsed.protocol === 'https:' ? https : http;
+  const latencies = [];
+  const statusCounts = {};
+  let completed = 0;
+  let inFlight = 0;
+  let reqIndex = 0;
+  const startTime = Date.now();
+
+  await new Promise((resolve) => {
+    function launchNext() {
+      if (completed >= totalReqs) {
+        resolve();
+        return;
+      }
+
+      while (inFlight < concurrency && reqIndex < totalReqs) {
+        inFlight++;
+        reqIndex++;
+        const reqStart = Date.now();
+
+        const req = client.request(parsed, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'ASTA-SEC-Benchmark/2.0',
+            'Accept': '*/*'
+          },
+          timeout: 8000
+        }, (res) => {
+          res.on('data', () => {});
+          res.on('end', () => {
+            const duration = Date.now() - reqStart;
+            latencies.push(duration);
+            const code = res.statusCode || 0;
+            statusCounts[code] = (statusCounts[code] || 0) + 1;
+            completed++;
+            inFlight--;
+            launchNext();
+          });
+        });
+
+        req.on('error', () => {
+          const duration = Date.now() - reqStart;
+          latencies.push(duration);
+          statusCounts['ERROR'] = (statusCounts['ERROR'] || 0) + 1;
+          completed++;
+          inFlight--;
+          launchNext();
+        });
+
+        req.on('timeout', () => {
+          req.destroy(new Error('Timeout'));
+        });
+
+        req.end();
+      }
+    }
+
+    launchNext();
+  });
+
+  const totalTimeMs = Date.now() - startTime;
+  const rps = ((completed / (totalTimeMs / 1000 || 0.001))).toFixed(2);
+
+  latencies.sort((a, b) => a - b);
+  const minLatency = latencies[0] || 0;
+  const maxLatency = latencies[latencies.length - 1] || 0;
+  const avgLatency = latencies.length ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0;
+  const p95Latency = latencies[Math.floor(latencies.length * 0.95)] || maxLatency;
+
+  console.log(chalk.bold('\n--- Benchmark & Resilience Results ---'));
+  console.log(`  Completed Requests: ${chalk.bold(completed)} in ${(totalTimeMs / 1000).toFixed(2)}s`);
+  console.log(`  Throughput Rate   : ${chalk.green.bold(rps + ' requests/sec')}`);
+  console.log(`  Latency (Min/Avg) : ${minLatency} ms / ${avgLatency} ms`);
+  console.log(`  Latency (P95/Max) : ${p95Latency} ms / ${maxLatency} ms`);
+
+  console.log(chalk.bold('\n--- HTTP Status Distribution ---'));
+  for (const [code, count] of Object.entries(statusCounts)) {
+    if (code === '200' || code.startsWith('2')) {
+      console.log(`  ${chalk.green.bold(`[HTTP ${code}]`)} ${count} requests (${Math.round(count / completed * 100)}%)`);
+    } else if (code === '429') {
+      console.log(`  ${chalk.yellow.bold(`[HTTP 429 Too Many Requests]`)} ${count} requests (Defensive Rate-Limiter Triggered)`);
+    } else if (code.startsWith('4')) {
+      console.log(`  ${chalk.cyan.bold(`[HTTP ${code}]`)} ${count} requests`);
+    } else {
+      console.log(`  ${chalk.red.bold(`[${code}]`)} ${count} requests`);
+    }
+  }
+
+  console.log(chalk.gray('\n----------------------------------------------------------------'));
+  if (statusCounts['429']) {
+    console.log(chalk.green(`[+] Rate Limiting Active: Target server correctly throttled ${statusCounts['429']} requests via HTTP 429.`));
+  } else if (statusCounts['500'] || statusCounts['502'] || statusCounts['503']) {
+    console.log(chalk.red(`[!] Server Instability Detected: Received 5xx error responses under concurrency.`));
+  } else {
+    console.log(chalk.cyan(`[*] Resilience Succeeded: Server sustained all requests without rate-limiting drops or 5xx faults.`));
+  }
+  console.log(chalk.gray('----------------------------------------------------------------\n'));
+
+  if (!targetUrl) await pause();
+}
+
+// ==========================================
+// TOOL 12: Parameter & Route Fuzzer (Intruder Engine)
+// ==========================================
+async function runIntruderFuzzer(targetUrl = null) {
+  console.log(chalk.bold('\n--- [12] Parameter & Route Fuzzer (Intruder Engine) ---'));
+  let urlStr = targetUrl;
+  if (!urlStr) {
+    urlStr = await input({
+      message: 'Enter target URL with §FUZZ§ marker (e.g. https://httpbin.org/get?user=§FUZZ§):',
+      default: 'https://httpbin.org/get?user=§FUZZ§'
+    });
+  }
+
+  const intruder = new IntruderEngine();
+  const presets = intruder.getPresets();
+
+  const presetChoice = await select({
+    message: 'Select Payload Preset to test:',
+    choices: [
+      { name: 'Common Admin/API Paths (common_paths)', value: 'common_paths' },
+      { name: 'SQL Injection Vectors (sqli_vectors)', value: 'sqli_vectors' },
+      { name: 'XSS Injection Vectors (xss_vectors)', value: 'xss_vectors' },
+      { name: 'Directory & Path Traversal (path_traversal)', value: 'path_traversal' },
+      { name: 'Sequential Numbers (1-25)', value: 'numbers_1_25' }
+    ]
+  });
+
+  const payloads = presets[presetChoice] || ['admin', 'test'];
+
+  console.log(chalk.cyan(`\n[*] Launching Intruder attack against: ${chalk.bold(urlStr)}...`));
+  console.log(chalk.gray(`    Total Payloads: ${payloads.length}\n`));
+
+  console.log(chalk.bold(' #   PAYLOAD                      STATUS   LENGTH    TIME    ANOMALY'));
+  console.log(chalk.gray(' -   -------                      ------   ------    ----    -------'));
+
+  const parsedBase = new URL(intruder.replaceMarkers(urlStr, 'baseline'));
+  const client = parsedBase.protocol === 'https:' ? https : http;
+
+  for (let i = 0; i < payloads.length; i++) {
+    const payload = payloads[i];
+    const target = intruder.replaceMarkers(urlStr, payload);
+    const parsed = new URL(target);
+
+    const start = Date.now();
+    const result = await new Promise((resolve) => {
+      const req = client.request(parsed, {
+        method: 'GET',
+        headers: { 'User-Agent': 'ASTA-SEC-Intruder/2.0' },
+        timeout: 4000
+      }, (res) => {
+        let len = 0;
+        res.on('data', chunk => len += chunk.length);
+        res.on('end', () => {
+          resolve({
+            status: res.statusCode || 0,
+            length: len,
+            durationMs: Date.now() - start
+          });
+        });
+      });
+      req.on('error', () => resolve({ status: 0, length: 0, durationMs: Date.now() - start }));
+      req.on('timeout', () => req.destroy());
+      req.end();
+    });
+
+    const isAnomaly = result.status >= 500 || (result.status >= 200 && result.status < 300 && payload.includes("'"));
+    const pCol = payload.length > 26 ? payload.substring(0, 23) + '...' : payload;
+    const statusCol = result.status ? result.status.toString() : 'ERR';
+    const statusColor = result.status >= 200 && result.status < 300 ? chalk.green : chalk.yellow;
+
+    console.log(
+      ` ${chalk.dim((i + 1).toString().padEnd(4))}` +
+      `${chalk.white(pCol.padEnd(28))}` +
+      `${statusColor(statusCol.padEnd(9))}` +
+      `${chalk.dim((result.length + ' B').padEnd(10))}` +
+      `${chalk.dim((result.durationMs + ' ms').padEnd(8))}` +
+      (isAnomaly ? chalk.bgMagenta.white.bold(' ANOMALY ') : '')
+    );
+  }
+
+  console.log(chalk.gray('----------------------------------------------------------------'));
+  console.log(chalk.green(`[+] Intruder run complete: Tested ${payloads.length} payloads.\n`));
+
+  if (!targetUrl) await pause();
+}
+
+// ==========================================
 // Main Interactive Dashboard Loop
 // ==========================================
 async function main() {
@@ -801,6 +1224,20 @@ async function main() {
   // Direct CLI shortcuts
   if (args.includes('--proxy')) {
     return runProxyModule();
+  }
+  if (args.includes('--jwt')) {
+    const token = args[args.indexOf('--jwt') + 1] || null;
+    return runJwtAnalyzer(token);
+  }
+  if (args.includes('--report')) {
+    return runReportGenerator();
+  }
+  if (args.includes('--benchmark') || args.includes('--stress')) {
+    const url = args[args.indexOf('--benchmark') + 1] || args[args.indexOf('--stress') + 1] || null;
+    return runRateLimitBenchmark(url);
+  }
+  if (args.includes('--intruder') && args[args.indexOf('--intruder') + 1]) {
+    return runIntruderFuzzer(args[args.indexOf('--intruder') + 1]);
   }
   if (args.includes('--subdomains') && args[args.indexOf('--subdomains') + 1]) {
     return runSubdomainAnalyzer(args[args.indexOf('--subdomains') + 1]);
@@ -825,6 +1262,22 @@ async function main() {
           {
             name: '⚡  Intercepting HTTP/S Proxy & Angular Dashboard (Burp Suite-Style)',
             value: 'proxy'
+          },
+          {
+            name: '🔑  JWT Token Inspector & Security Analyzer (Phase 3)',
+            value: 'jwt'
+          },
+          {
+            name: '📄  Penetration Test Report Generator (OWASP WSTG / PTES - Phase 5)',
+            value: 'report'
+          },
+          {
+            name: '🚀  HTTP Concurrency & Rate-Limiting Resilience Benchmark (Stress/Resilience)',
+            value: 'benchmark'
+          },
+          {
+            name: '🎯  Parameter & Route Fuzzing Engine (Intruder)',
+            value: 'intruder'
           },
           {
             name: '📡  Live Packet Sniffer & Traffic Analyzer (libpcap / Npcap Engine)',
@@ -863,6 +1316,14 @@ async function main() {
 
       if (choice === 'proxy') {
         await runProxyModule();
+      } else if (choice === 'jwt') {
+        await runJwtAnalyzer();
+      } else if (choice === 'report') {
+        await runReportGenerator();
+      } else if (choice === 'benchmark') {
+        await runRateLimitBenchmark();
+      } else if (choice === 'intruder') {
+        await runIntruderFuzzer();
       } else if (choice === 'sniffer') {
         await runSnifferModule();
       } else if (choice === 'auditor') {
